@@ -25,18 +25,19 @@ namespace SqlBackupScheduler
             string ftpUploadPath = configuration["FtpUploadPath"];
 
             // Backup the databases
-            BackupDatabases(connectionString, backupLocation, databases);
+            string[] backups = BackupDatabases(connectionString, backupLocation, databases);
 
 
             // Upload the backups to the FTP server
-            UploadBackupsToFtp(backupLocation, ftpServer, ftpUsername, ftpPassword, ftpUploadPath);
+             UploadBackupsToFtp(backups, ftpServer, ftpUsername, ftpPassword, ftpUploadPath);
 
             // Clean up old backups
             CleanupOldBackups(backupLocation, backupRetentionDays);
         }
 
-        static void BackupDatabases(string connectionString, string backupLocation, string[] databases)
+        static string[] BackupDatabases(string connectionString, string backupLocation, string[] databases)
         {
+            List<string> newBackups = new List<string>();
             using (SqlConnection connection = new SqlConnection(connectionString))
             {
                 connection.Open();
@@ -58,6 +59,7 @@ namespace SqlBackupScheduler
                             command.ExecuteNonQuery();
                             Console.WriteLine($"Database '{database}' backed up successfully to '{backupFileName}'.");
                         }
+                        newBackups.Add(backupFileName);
                     }
                     catch (Exception ex)
                     {
@@ -66,15 +68,13 @@ namespace SqlBackupScheduler
                     }
                 }
             }
+            return newBackups.ToArray();
         }
 
-        static void UploadBackupsToFtp(string backupLocation, string ftpServer, string ftpUsername, string ftpPassword, string ftpUploadPath)
+        static void UploadBackupsToFtp(string[] backupFiles, string ftpServer, string ftpUsername, string ftpPassword, string ftpUploadPath)
         {
             try
             {
-                // Get all .bak files in the backup directory
-                var backupFiles = Directory.GetFiles(backupLocation, "*.bak");
-
                 foreach (var file in backupFiles)
                 {
                     // Determine the URI for the FTP upload
