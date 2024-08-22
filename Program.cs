@@ -55,6 +55,7 @@ namespace SqlBackupScheduler
                     {
                         using (SqlCommand command = new SqlCommand(backupQuery, connection))
                         {
+                            command.CommandTimeout = 0;
                             // Execute the backup command
                             command.ExecuteNonQuery();
                             Console.WriteLine($"Database '{database}' backed up successfully to '{backupFileName}'.");
