@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using System.Data.SqlClient;
+using System.Net;
 
 namespace SqlBackupScheduler
 {
@@ -18,9 +19,17 @@ namespace SqlBackupScheduler
             string backupLocation = configuration["BackupLocation"];
             string[] databases = configuration.GetSection("Databases").Get<string[]>();
             int backupRetentionDays = int.Parse(configuration["BackupRetentionDays"]);
+            string ftpServer = configuration["FtpServer"];
+            string ftpUsername = configuration["FtpUsername"];
+            string ftpPassword = configuration["FtpPassword"];
+            string ftpUploadPath = configuration["FtpUploadPath"];
 
             // Backup the databases
             BackupDatabases(connectionString, backupLocation, databases);
+
+
+            // Upload the backups to the FTP server
+            UploadBackupsToFtp(backupLocation, ftpServer, ftpUsername, ftpPassword, ftpUploadPath);
 
             // Clean up old backups
             CleanupOldBackups(backupLocation, backupRetentionDays);
@@ -56,6 +65,47 @@ namespace SqlBackupScheduler
                         Console.WriteLine($"Error backing up database '{database}': {ex.Message}");
                     }
                 }
+            }
+        }
+
+        static void UploadBackupsToFtp(string backupLocation, string ftpServer, string ftpUsername, string ftpPassword, string ftpUploadPath)
+        {
+            try
+            {
+                // Get all .bak files in the backup directory
+                var backupFiles = Directory.GetFiles(backupLocation, "*.bak");
+
+                foreach (var file in backupFiles)
+                {
+                    // Determine the URI for the FTP upload
+                    string fileName = Path.GetFileName(file);
+                    string ftpUri = $"{ftpServer}{ftpUploadPath}{fileName}";
+
+                    // Create an FTP request
+                    FtpWebRequest request = WebRequest.Create(ftpUri) as FtpWebRequest;
+                    request.Method = WebRequestMethods.Ftp.UploadFile;
+                    request.Credentials = new NetworkCredential(ftpUsername, ftpPassword);
+
+                    // Load the file into a byte array
+                    byte[] fileContents = File.ReadAllBytes(file);
+
+                    // Write the file to the FTP server
+                    using (Stream requestStream = request.GetRequestStream())
+                    {
+                        requestStream.Write(fileContents, 0, fileContents.Length);
+                    }
+
+                    // Get the response from the FTP server
+                    using (FtpWebResponse response = (FtpWebResponse)request.GetResponse())
+                    {
+                        Console.WriteLine($"Uploaded '{fileName}' to FTP server. Status: {response.StatusDescription}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle any errors that occur during the FTP upload
+                Console.WriteLine($"Error uploading backups to FTP server: {ex.Message}");
             }
         }
 
