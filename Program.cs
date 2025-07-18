@@ -113,7 +113,6 @@ namespace SqlBackupScheduler
             {
                 ServiceURL = endpoint,
                 ForcePathStyle = true,
-                RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(region)
             };
 
             using var client = new AmazonS3Client(credentials, config);
